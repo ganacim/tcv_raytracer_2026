@@ -170,10 +170,11 @@ class TranslucidMaterial(SimpleMaterial):
             spec_intensity = max(view_dir.dot(reflect_dir), 0) ** self.specular_shininess
             shaded_color += (self.specular_color @ light.color) * self.specular_coefficient * spec_intensity*light.intensity
 
-        transmitted_color = Color(1, 0, 0)
+        transmitted_color = Color(0, 0, 0)
         if hit_record.ray.depth < scene.max_depth:
             # transmission component
             k = 1 - eta**2 * (1 - c**2)
+            transmitted_color = scene.background * self.transmission_coefficient
             if k >= 0: # if k < 0 total internal reflection occurs
                 refract_dir =  (-view_dir * eta  + n * (eta * c - math.sqrt(k))).normalize()
                 transmission_ray = Ray(hit_record.point, refract_dir, hit_record.ray.depth + 1)
@@ -181,8 +182,14 @@ class TranslucidMaterial(SimpleMaterial):
                 if transmission_hit.hit:
                     transmission_material = transmission_hit.material
                     transmitted_color = transmission_material.shade(transmission_hit, scene) * self.transmission_coefficient
-                else:
-                    transmitted_color = scene.background * self.transmission_coefficient
+            else:
+                # total internal reflection, treat as perfect mirror
+                reflect_dir = (n * 2 * n.dot(view_dir) - view_dir).normalize()
+                reflection_ray = Ray(hit_record.point, reflect_dir, hit_record.ray.depth + 1)
+                reflection_hit = scene.hit(reflection_ray)
+                if reflection_hit.hit:
+                    reflection_material = reflection_hit.material
+                    transmitted_color = reflection_material.shade(reflection_hit, scene) * self.transmission_coefficient
         else:
             transmitted_color = Color(0, 1, 0)
             
